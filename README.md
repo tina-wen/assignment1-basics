@@ -6,6 +6,15 @@ For a full description of the assignment, see the assignment handout at
 If you see any issues with the assignment handout or code, please feel free to
 raise a GitHub issue or open a pull request with a fix.
 
+## Progress
+
+train_bpe和bpe_tokenizer作业已完成，执行以下两行命令即可查看单元测试通过情况
+```sh
+uv run pytest tests/fixtures/test_train_bpe.py
+uv run pytest tests/fixtures/test_tokenizer.py
+```
+
+
 ## Setup
 
 ### Environment

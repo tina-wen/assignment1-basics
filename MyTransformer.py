@@ -2,6 +2,9 @@
 import torch
 import torch.nn as nn
 from torch.nn import Module
+from typing import Optional
+from collections.abc import Callable, Iterable
+import math
 
 class MyLinear(Module):
     def __init__(self, in_features: int, out_features: int, device = None, dtype = None):
@@ -222,5 +225,65 @@ def load_multi_weights(model, weights: dict[str, torch.Tensor]):
             new_state_dict[weight_mapping[key]] = val
     model.load_state_dict(new_state_dict,strict=True)
 
+def MyCrossEntropy(inputs: torch.Tensor, targets: torch.Tensor):
+    batch_size = inputs.shape[0]
+    inputs = inputs - torch.max(inputs, dim = -1, keepdim = True).values
+    probs = inputs - torch.log(torch.sum(torch.exp(inputs), dim=-1, keepdim=True))
+    loss = torch.mean(probs[torch.arange(batch_size),targets])
+    return -loss
 
+
+class MyAdamW(torch.optim.Optimizer):
+    def __init__(self, params, lr, weight_decay, betas, eps):
+        defaults = {'lr': lr, 'weight_decay': weight_decay, 'betas': betas, 'eps': eps}
+        super().__init__(params, defaults)
     
+    def step(self, closure: Optional[Callable] = None):
+        loss = None if closure is None else closure()
+        for group in self.param_groups:
+            lr, beta1, beta2, eps, lamda = group['lr'], group['betas'][0], group['betas'][1], group['eps'], group['weight_decay']
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                
+                state = self.state[p]
+                m, v, t = state.get("m",torch.zeros_like(p.data)), state.get("v",torch.zeros_like(p.data)), state.get("t",1)
+
+                grad = p.grad.data
+                m = beta1 * m + (1 - beta1) * grad
+                v = beta2 * v + (1 - beta2) * (grad ** 2)
+                
+                alpha_t = lr * math.sqrt(1 - beta2 ** t)/(1 - beta1 ** t)
+                p.data -= alpha_t * m / (torch.sqrt(v) + eps) 
+                p.data -= lr * lamda * p.data
+
+                # 状态更新
+                state["m"] = m
+                state["v"] = v
+                state["t"] = t + 1
+        return loss
+
+
+def MyScheduler(t, lr_max, lr_min, T_w, T_c):
+    if t < T_w:
+        return t/T_w * lr_max
+    if t <= T_c:
+        return lr_min + 0.5 * (1 + math.cos((t - T_w) / (T_c - T_w) * math.pi)) * (lr_max - lr_min)    
+    return lr_min
+
+def MyGradClip(params, max_l2_norm, eps = 1e-06):
+    total_grad_norm = 0.0
+    for p in params:
+        if p.grad is not None:
+            total_grad_norm += torch.sum(p.grad.data ** 2)
+    
+    total_grad_norm = total_grad_norm ** 0.5
+
+    if total_grad_norm >= max_l2_norm:
+        clip_k = max_l2_norm / (total_grad_norm + eps)
+        for p in params:
+            if p.grad is not None:
+                p.grad.data *= clip_k
+
+    return
+            

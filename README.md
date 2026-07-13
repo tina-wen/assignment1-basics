@@ -8,10 +8,15 @@ raise a GitHub issue or open a pull request with a fix.
 
 ## Progress
 
+已经可以执行基本的训练循环
+```sh
+uv run train.py --config assignment1-cfg.json
+```
+
 train_bpe和bpe_tokenizer作业已完成，执行以下两行命令即可查看单元测试通过情况
 ```sh
-uv run pytest tests/fixtures/test_train_bpe.py
-uv run pytest tests/fixtures/test_tokenizer.py
+uv run pytest tests/test_train_bpe.py
+uv run pytest tests/test_tokenizer.py
 ```
 
 

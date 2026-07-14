@@ -21,7 +21,7 @@ def train(cfg):
 
     run = wandb.init(project="ass1", )
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
 
     while step < cfg.max_train_steps:
         optimizer.zero_grad()

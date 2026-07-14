@@ -7,7 +7,27 @@ from utils import load_checkpoint, get_batch, save_checkpoint, GradClip
 import numpy as np
 import torch
 
+import logging
+from pathlib import Path
+from datetime import datetime
+
+def setup_logging(log_file):
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path, encoding="utf-8"),
+        ],
+        force=True,
+    )
+
 def train(cfg):
+    setup_logging(cfg.log_file)
+
     model = TransLM(cfg.d_model, cfg.num_heads, cfg.d_ff, cfg.vocab_size, cfg.num_layers, cfg.device)
     optimizer = AdamW(model.parameters(), cfg.lr, cfg.weight_decay, cfg.betas, cfg.eps)
     scheduler = CosineScheduler(optimizer, cfg.lr_max, cfg.lr_min, cfg.T_w, cfg.T_c)
@@ -19,7 +39,9 @@ def train(cfg):
     else:
         step = 0
 
-    run = wandb.init(project="ass1", )
+    run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run = wandb.init(project="ass1", name=run_name)
+    logging.info("Logging initialized. Writing to %s", cfg.log_file)
 
     # torch.autograd.set_detect_anomaly(True)
 
@@ -36,8 +58,8 @@ def train(cfg):
         
         grad_norm = GradClip(model.parameters(),cfg.max_l2_norm,)
 
-        if cfg.ckpt_save_step is not None and step == cfg.ckpt_save_step:
-            save_checkpoint(model,optimizer,step,cfg.ckpt_save_path)
+        # if cfg.ckpt_save_step is not None and step == cfg.ckpt_save_step:
+        #     save_checkpoint(model,optimizer,step,cfg.ckpt_save_path)
 
         optimizer.step()
         scheduler.step(step)
@@ -48,6 +70,14 @@ def train(cfg):
             "grad": grad_norm,
             "lr": optimizer.param_groups[0]['lr'],
         })
+        
+        logging.info(f"Step: {step}, Loss: {loss.item():.4f}, Grad Norm: {grad_norm:.4f}, Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
+        
+
+        if step and step % 10000 == 0:
+            save_checkpoint(model,optimizer,step,f"ckpt/step_{step}.pt")
+
+        step += 1
 
 
 class TrainConfig:
@@ -57,6 +87,7 @@ class TrainConfig:
                  batch_size, context_length,
                  max_l2_norm,
                  data_path,
+                 log_file="logs/train.log",
                  resume=False,
                  load_ckpt_path=None,
                  ckpt_save_step=None,
@@ -85,6 +116,7 @@ class TrainConfig:
         self.max_l2_norm = max_l2_norm
 
         self.data_path = data_path
+        self.log_file = log_file
 
         self.resume = resume
         self.load_ckpt_path = load_ckpt_path
@@ -107,13 +139,13 @@ if __name__ == "__main__":
 
     
     # from tests.test_tokenizer import get_tokenizer_from_vocab_merges_path
-    # tokenizer = get_tokenizer_from_vocab_merges_path('tests/fixtures/train-bpe-reference-vocab.json', 'tests/fixtures/train-bpe-reference-merges.txt', special_tokens = ["<|endoftext|>"])
+    # tokenizer = get_tokenizer_from_vocab_merges_path('tests/fixtures/gpt2_vocab.json', 'tests/fixtures/gpt2_merges.txt', special_tokens = ["<|endoftext|>"])
 
     # with open("./tests/fixtures/tinystories_sample_5M.txt") as f:
-    #     corpus_contents = f.read()
+    #     contents = f.read()
 
-    # corpus_token_id = tokenizer.encode(corpus_contents)
-    # tokens = np.array(corpus_token_id, dtype = np.uint16)
+    # token_id = tokenizer.encode(contents)
+    # tokens = np.array(token_id, dtype = np.uint16)
 
     # tokens.tofile('./data/train.bin')
 

@@ -3,9 +3,9 @@ from loss import LogProb
 import numpy as np
 from train_bpe import BPETokenizer
 from transformer import TransLM
-
+from utils import load_checkpoint
 from tests.test_tokenizer import get_tokenizer_from_vocab_merges_path
-tokenizer = get_tokenizer_from_vocab_merges_path('tests/fixtures/train-bpe-reference-vocab.json', 'tests/fixtures/train-bpe-reference-merges.txt', special_tokens = ["<|endoftext|>"])  
+tokenizer = get_tokenizer_from_vocab_merges_path('tests/fixtures/gpt2_vocab.json', 'tests/fixtures/gpt2_merges.txt', special_tokens = ["<|endoftext|>"])  
 
 
 def top_p_sample(logits: torch.Tensor, p: float = 0.9, tao: float = 1.0):
@@ -42,14 +42,15 @@ def inference(prompt: str, tokenizer: BPETokenizer, model: TransLM, stop_token: 
         
         token_ids.append(next_token)
         if next_token == stop_token:
-            break
+            return token_ids
         step += 1
     return token_ids
 
 
 if __name__ == "__main__":
-    model = TransLM(512, 8, 2048, 500, 6, 'cuda')
-    prompt =  "The capital of France is"
+    model = TransLM(512, 16, 1344, 50257, 4, 'cuda')
+    load_checkpoint('./ckpt/step_10000.pt', model, None)
+    prompt =  "Lily and Ben were playing in the park."
     token_ids = inference(prompt, tokenizer, model, stop_token=0, max_len=100, device='cuda')
     outputs = tokenizer.decode(token_ids)
     print(f"Prompt:{prompt}\nOutput: {outputs}\n")
